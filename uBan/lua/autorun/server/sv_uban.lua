@@ -5,47 +5,90 @@ uBan.Bans = {
 	sID1 = "EXAMPLE",
 }
 
+uBan.TempBans = {
+	sID1 = "EXAMPLE|0"
+}
+
 if !file.Exists("uBans.txt", "DATA") then
 	file.Write("uBans.txt", util.TableToJSON(uBan.Bans))
 else
 	uBan.Bans = util.JSONToTable(file.Read("uBans.txt", "DATA"))
 end
 
+if !file.Exists("uBans_Temp.txt", "DATA") then
+	file.Write("uBans_Temp.txt", util.TableToJSON(uBan.TempBans))
+else
+	uBan.TempBans = util.JSONToTable(file.Read("uBans_Temp.txt", "DATA"))
+end
+
 function uBan.Unban(sID)
-	if !util.SteamIDTo64(sID) then return end
-	if !uBan.Bans["sID" .. util.SteamIDTo64(sID)] then return end
+	if !string.find(sID, "STEAM") then return end
+	if !uBan.Bans["sID" .. util.SteamIDTo64(sID)] and !uBan.TempBans["sID" .. util.SteamIDTo64(sID)] then return end
 	
-	print("[uBan] Unbanned SteamID " .. sID .. " (" .. uBan.Bans["sID" .. util.SteamIDTo64(sID)] .. ")")
-	uBan.Bans["sID" .. util.SteamIDTo64(sID)] = nil
-	file.Write("uBans.txt", util.TableToJSON(uBan.Bans))
+	local reason = " "
+	if uBan.Bans["sID" .. util.SteamIDTo64(sID)] then
+		reason = uBan.Bans["sID" .. util.SteamIDTo64(sID)]
+	else
+		reason = string.Explode("|", uBan.TempBans["sID" .. util.SteamIDTo64(sID)])[1]
+	end
+	
+	print("[uBan] Unbanned SteamID " .. sID .. "(" .. reason .. ")")
+	if uBan.Bans["sID" .. util.SteamIDTo64(sID)] then
+		uBan.Bans["sID" .. util.SteamIDTo64(sID)] = nil
+		file.Write("uBans.txt", util.TableToJSON(uBan.Bans))
+	else
+		uBan.TempBans["sID" .. util.SteamIDTo64(sID)] = nil
+		file.Write("uBans_Temp.txt", util.TableToJSON(uBan.TempBans))
+	end
 end
 
-function uBan.Ban(ply, reason)
-	if !IsValid(ply) or !ply or !reason then return end
+function uBan.Ban(ply, reason, time)
+	if !IsValid(ply) or !ply or !reason or 0 > time then return end
 	
-	print("[uBan] Banned player " .. ply:Nick() .. " for " .. reason)
-	uBan.Bans["sID" .. ply:SteamID64()] = reason
-	file.Write("uBans.txt", util.TableToJSON(uBan.Bans))
-	ply:Kick("[uBan] You have been banned from this server for: " .. reason)
+	if !time or time == 0 then
+		print("[uBan] Permanently banned player " .. ply:Nick() .. " for " .. reason)
+		uBan.Bans["sID" .. ply:SteamID64()] = reason
+		file.Write("uBans.txt", util.TableToJSON(uBan.Bans))
+		ply:Kick("[uBan] You have been permanently banned from this server for:\n" .. reason)
+	else
+		print("[uBan] Banned player " .. ply:Nick() .. " for " .. reason .. " (" .. string.NiceTime(time) .. ")")
+		uBan.TempBans["sID" .. ply:SteamID64()] = reason .. "|" .. tostring(time)
+		file.Write("uBans_Temp.txt", util.TableToJSON(uBan.TempBans))
+		ply:Kick("[uBan] You have been temporarily banned from this server for:\n" .. reason .. "\nTime remaining:\n" .. string.NiceTime(time))
+	end
 end
 
-function uBan.BanID(sID, reason)
+function uBan.BanID(sID, reason, time)
 	if !string.find(sID, "STEAM") then return end
 	
-	print("[uBan] Banned SteamID " .. sID .. " for " .. reason)
-	uBan.Bans["sID" .. util.SteamIDTo64(sID)] = reason
-	file.Write("uBans.txt", util.TableToJSON(uBan.Bans))
+	if !time or time == 0 then
+		print("[uBan] Permanently banned SteamID " .. sID .. " for " .. reason)
+		uBan.Bans["sID" .. util.SteamIDTo64(sID)] = reason
+		file.Write("uBans.txt", util.TableToJSON(uBan.Bans))
+	else
+		print("[uBan] Banned SteamID " .. sID .. " for " .. reason .. " (" .. string.NiceTime(time) .. ")")
+		uBan.TempBans["sID" .. util.SteamIDTo64(sID)] = reason .. "|" .. tostring(time)
+		file.Write("uBans_Temp.txt", util.TableToJSON(uBan.TempBans))
+	end
 	
 	for k,v in next, player.GetAll() do
-		if ply:SteamID() == sID then
-			ply:Kick("[uBan] You have been banned from this server for: " .. reason)
+		if v:SteamID() == sID then
+			if !time or time == 0 then
+				v:Kick("[uBan] You have been permanently banned from this server for:\n" .. reason)
+			else
+				v:Kick("[uBan] You have been temporarily banned from this server for:\n" .. reason .. "\nTime remaining:\n" .. string.NiceTime(time))
+			end
 		end
 	end
 end
 
 function uBan.CheckBanned(sID64, ip, svpass, clpass, name)
 	if uBan.Bans["sID" .. sID64] then
-		return false, "[uBan] You have been banned from this server for: " .. uBan.Bans["sID" .. sID64]
+		return false, "[uBan] You have been permanently banned from this server for: " .. uBan.Bans["sID" .. sID64]
+	end
+	
+	if uBans.TempBans["sID" .. sID64] then
+		return false, "[uBan] You have been temporarily banned from this server for:\n" .. string.Explode("|", uBan.TempBans["sID" .. sID64])[1] .. "\nTime remaining:\n" .. string.Explode("|", uBan.TempBans["sID" .. sID64])[2]
 	end
 end
 
@@ -53,8 +96,8 @@ hook.Add("CheckPassword", "uBan.CheckBanned", uBan.CheckBanned)
 
 local _R = debug.getregistry()
 
-function _R.Player:uBan(reason)
-	uBan.Ban(self, reason)
+function _R.Player:uBan(reason, time)
+	uBan.Ban(self, reason, time or 0)
 end
 
 print("[uBan] Loaded!")
