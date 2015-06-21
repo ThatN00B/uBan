@@ -1,0 +1,5 @@
+"AddonInfo"
+{
+	"name"	"uBan"
+	"info"	"Simple banning addon"
+}
