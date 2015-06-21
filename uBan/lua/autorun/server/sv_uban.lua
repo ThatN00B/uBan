@@ -106,8 +106,7 @@ function uBan.RemoveTime()
 		
 		if 0 >= tonumber(tbl[2]) then
 			local sID = string.Explode("D", k)[2]
-			uBan.TempBans[k] = nil
-			file.Write("uBans_Temp.txt", util.TableToJSON(uBan.TempBans))
+			uBan.Unban(util.SteamIDFrom64(sID))
 		end
 		
 		local time = tonumber(tbl[2])
