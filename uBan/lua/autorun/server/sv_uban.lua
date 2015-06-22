@@ -87,7 +87,7 @@ function uBan.CheckBanned(sID64, ip, svpass, clpass, name)
 		return false, "\n[uBan] You have been permanently banned from this server: " .. uBan.Bans["sID" .. sID64]
 	end
 	
-	if uBans.TempBans["sID" .. sID64] then
+	if uBan.TempBans["sID" .. sID64] then
 		return false, "\n[uBan] You have been temporarily banned from this server:\n" .. string.Explode("|", uBan.TempBans["sID" .. sID64])[1] .. "\nTime remaining:\n" .. string.Explode("|", uBan.TempBans["sID" .. sID64])[2]
 	end
 end
